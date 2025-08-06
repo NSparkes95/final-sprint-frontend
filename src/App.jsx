@@ -5,13 +5,15 @@ import Admin from "./pages/Admin";
 
 function App() {
   return (
-    <div>
+    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
       <h1>Cleared Flights</h1>
-      <nav>
-        <Link to="/">Arrivals</Link> |{" "}
-        <Link to="/departures">Departures</Link> |{" "}
-        <Link to="/admin">Admin</Link>
+      
+      <nav style={{ marginBottom: "20px" }}>
+        <Link to="/" style={{ marginRight: "10px" }}>Arrivals</Link> |{" "}
+        <Link to="/departures" style={{ margin: "0 10px" }}>Departures</Link> |{" "}
+        <Link to="/admin" style={{ marginLeft: "10px" }}>Admin</Link>
       </nav>
+
       <Routes>
         <Route path="/" element={<Arrivals />} />
         <Route path="/departures" element={<Departures />} />
