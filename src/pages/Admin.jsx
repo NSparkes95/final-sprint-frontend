@@ -3,24 +3,42 @@ import axios from "axios";
 
 const Admin = () => {
   const [flights, setFlights] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    axios
-      .get("http://localhost:8080/flights")
-      .then((response) => {
+    const fetchFlights = async () => {
+      try {
+        setIsLoading(true);
+
+        // Artificial delay for testing the loading spinner
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const response = await axios.get("http://localhost:8080/flights");
         setFlights(response.data);
-      })
-      .catch((error) => {
-        console.error("Error fetching flights:", error);
-      });
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching flights:", err);
+        setError("Error fetching flights. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFlights();
   }, []);
 
   return (
     <div>
       <h2>Admin Panel – All Flights</h2>
-      {flights.length === 0 ? (
+
+      {isLoading && <p>Loading all flights...</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      {!isLoading && !error && flights.length === 0 && (
         <p>No flights found.</p>
-      ) : (
+      )}
+
+      {!isLoading && !error && flights.length > 0 && (
         <ul>
           {flights.map((flight) => (
             <li key={flight.id}>

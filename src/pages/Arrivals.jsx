@@ -3,27 +3,46 @@ import axios from 'axios';
 
 const Arrivals = () => {
   const [arrivals, setArrivals] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    axios.get('http://localhost:8080/flights')
-      .then(response => {
+    const fetchArrivals = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Artificial delay for testing the loading spinner
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const response = await axios.get('http://localhost:8080/flights');
         const data = response.data;
         const filteredArrivals = data.filter(
           flight => flight.arrivalAirport?.name === "St. John's Intl"
         );
         setArrivals(filteredArrivals);
-      })
-      .catch(error => {
-        console.error('Error fetching flights:', error);
-      });
+      } catch (err) {
+        console.error('Error fetching flights:', err);
+        setError('Error fetching arrivals. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchArrivals();
   }, []);
 
   return (
     <div>
       <h2>Arrivals</h2>
-      {arrivals.length === 0 ? (
+
+      {isLoading && <p>Loading arrivals...</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {!isLoading && !error && arrivals.length === 0 && (
         <p>No arrivals found.</p>
-      ) : (
+      )}
+
+      {!isLoading && !error && arrivals.length > 0 && (
         <ul>
           {arrivals.map((flight) => (
             <li key={flight.id}>
