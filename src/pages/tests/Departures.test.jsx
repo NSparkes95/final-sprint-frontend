@@ -10,7 +10,7 @@ describe('Departures Component', () => {
     const mockFlights = [
       {
         id: 1,
-        departureAirport: { name: "St. John's Intl" }, // ✅ exact match for filter
+        departureAirport: { name: "St. John's Intl" }, 
         arrivalAirport: { name: 'Toronto Pearson' },
         aircraft: { airlineName: 'Air Canada', type: 'Boeing 737' },
         gate: { code: 'A1' }
