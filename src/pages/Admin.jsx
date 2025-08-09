@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../services/api";
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const isTest = import.meta?.env?.MODE === "test";
 
 const Admin = () => {
   const [flights, setFlights] = useState([]);
@@ -23,11 +26,12 @@ const Admin = () => {
   const [airportForm, setAirportForm] = useState({ name: "" });
   const [editingAirportId, setEditingAirportId] = useState(null);
 
+  // Flights
   const fetchFlights = async () => {
     try {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const response = await axios.get("http://localhost:8080/flights");
+      if (!isTest) await sleep(500); // don’t slow tests
+      const response = await api.get("/flights");
       setFlights(response.data);
       setError(null);
     } catch (err) {
@@ -38,9 +42,10 @@ const Admin = () => {
     }
   };
 
+  // Gates
   const fetchGates = async () => {
     try {
-      const res = await axios.get("http://localhost:8080/gates");
+      const res = await api.get("/gates");
       setGates(res.data);
     } catch (err) {
       console.error("Error fetching gates:", err);
@@ -48,9 +53,10 @@ const Admin = () => {
     }
   };
 
+  // Airports
   const fetchAirports = async () => {
     try {
-      const res = await axios.get("http://localhost:8080/airports");
+      const res = await api.get("/airports");
       setAirports(res.data);
     } catch (err) {
       console.error("Error fetching airports:", err);
@@ -62,8 +68,10 @@ const Admin = () => {
     fetchFlights();
     fetchGates();
     fetchAirports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // FLIGHT CRUD
   const handleInputChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
@@ -74,24 +82,17 @@ const Admin = () => {
         airlineName: form.airlineName,
         type: form.type,
       },
-      departureAirport: {
-        name: form.departureAirport,
-      },
-      arrivalAirport: {
-        name: form.arrivalAirport,
-      },
-      gate: {
-        code: form.gateCode,
-      },
+      departureAirport: { name: form.departureAirport },
+      arrivalAirport: { name: form.arrivalAirport },
+      gate: { code: form.gateCode },
     };
 
     try {
       if (editingFlightId) {
-        await axios.put(`http://localhost:8080/flights/${editingFlightId}`, flightData);
+        await api.put(`/flights/${editingFlightId}`, flightData);
       } else {
-        await axios.post("http://localhost:8080/flights", flightData);
+        await api.post("/flights", flightData);
       }
-
       setForm({
         airlineName: "",
         type: "",
@@ -120,7 +121,7 @@ const Admin = () => {
 
   const handleDeleteFlight = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/flights/${id}`);
+      await api.delete(`/flights/${id}`);
       fetchFlights();
     } catch (err) {
       console.error("Error deleting flight:", err);
@@ -139,12 +140,13 @@ const Admin = () => {
     });
   };
 
+  // GATE CRUD
   const handleAddOrUpdateGate = async () => {
     try {
       if (editingGateId) {
-        await axios.put(`http://localhost:8080/gates/${editingGateId}`, gateForm);
+        await api.put(`/gates/${editingGateId}`, gateForm);
       } else {
-        await axios.post("http://localhost:8080/gates", gateForm);
+        await api.post("/gates", gateForm);
       }
       setGateForm({ code: "" });
       setEditingGateId(null);
@@ -162,7 +164,7 @@ const Admin = () => {
 
   const handleDeleteGate = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/gates/${id}`);
+      await api.delete(`/gates/${id}`);
       fetchGates();
     } catch (err) {
       console.error("Error deleting gate:", err);
@@ -175,12 +177,13 @@ const Admin = () => {
     setGateForm({ code: "" });
   };
 
+  // AIRPORT CRUD
   const handleAddOrUpdateAirport = async () => {
     try {
       if (editingAirportId) {
-        await axios.put(`http://localhost:8080/airports/${editingAirportId}`, airportForm);
+        await api.put(`/airports/${editingAirportId}`, airportForm);
       } else {
-        await axios.post("http://localhost:8080/airports", airportForm);
+        await api.post("/airports", airportForm);
       }
       setAirportForm({ name: "" });
       setEditingAirportId(null);
@@ -198,7 +201,7 @@ const Admin = () => {
 
   const handleDeleteAirport = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/airports/${id}`);
+      await api.delete(`/airports/${id}`);
       fetchAirports();
     } catch (err) {
       console.error("Error deleting airport:", err);
@@ -216,14 +219,19 @@ const Admin = () => {
       <h2>Admin Panel – All Flights</h2>
 
       {/* Flight Form */}
-      <div style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}>
+      <div
+        data-testid="flight-form"
+        style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}
+      >
         <h3>{editingFlightId ? "Edit Flight" : "Add New Flight"}</h3>
         <input name="airlineName" placeholder="Airline Name" value={form.airlineName} onChange={handleInputChange} />
         <input name="type" placeholder="Aircraft Type" value={form.type} onChange={handleInputChange} />
         <input name="departureAirport" placeholder="Departure Airport" value={form.departureAirport} onChange={handleInputChange} />
         <input name="arrivalAirport" placeholder="Arrival Airport" value={form.arrivalAirport} onChange={handleInputChange} />
-        <input name="gateCode" placeholder="Gate Code" value={form.gateCode} onChange={handleInputChange} />
-        <button onClick={handleAddOrUpdateFlight}>{editingFlightId ? "Update Flight" : "Add Flight"}</button>
+        <input name="gateCode" placeholder="Gate Code" data-testid="flight-gateCode" value={form.gateCode} onChange={handleInputChange} />
+        <button onClick={handleAddOrUpdateFlight}>
+          {editingFlightId ? "Update Flight" : "Add Flight"}
+        </button>
         {editingFlightId && <button onClick={handleCancelEdit}>Cancel</button>}
       </div>
 
@@ -232,13 +240,14 @@ const Admin = () => {
       {!isLoading && !error && flights.length === 0 && <p>No flights found.</p>}
 
       {!isLoading && !error && flights.length > 0 && (
-        <ul>
+        <ul data-testid="flights-list">
           {flights.map((flight) => (
             <li key={flight.id} style={{ marginBottom: "0.5rem" }}>
-              ✈️ <strong>{flight.aircraft?.airlineName || "Unknown Airline"}</strong>
-              from <strong>{flight.departureAirport?.name || "Unknown"}</strong>
-              to <strong>{flight.arrivalAirport?.name || "Unknown"}</strong><br />
-              Gate: {flight.gate?.code || "TBD"} | Type: {flight.aircraft?.type || "Unknown"}
+              ✈️ <strong>{flight.aircraft?.airlineName || "Unknown Airline"}</strong>{" "}
+              from <strong>{flight.departureAirport?.name || "Unknown"}</strong>{" "}
+              to <strong>{flight.arrivalAirport?.name || "Unknown"}</strong>
+              <br />
+              Gate: {flight.gate?.code || "TBD"} | Type: {flight.aircraft?.type || "Unknown"}{" "}
               <button onClick={() => handleEditFlight(flight)}>Edit</button>
               <button onClick={() => handleDeleteFlight(flight.id)}>Delete</button>
             </li>
@@ -250,16 +259,29 @@ const Admin = () => {
       <hr />
       <h2>Manage Gates</h2>
 
-      <div style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}>
+      <div
+        data-testid="gates-form"
+        style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}
+      >
         <h3>{editingGateId ? "Edit Gate" : "Add New Gate"}</h3>
-        <input name="code" placeholder="Gate Code" value={gateForm.code} onChange={(e) => setGateForm({ code: e.target.value })} />
-        <button onClick={handleAddOrUpdateGate}>{editingGateId ? "Update Gate" : "Add Gate"}</button>
+        <input
+          name="code"
+          placeholder="Gate Code"
+          data-testid="gate-code"
+          value={gateForm.code}
+          onChange={(e) => setGateForm({ code: e.target.value })}
+        />
+        <button onClick={handleAddOrUpdateGate}>
+          {editingGateId ? "Update Gate" : "Add Gate"}
+        </button>
         {editingGateId && <button onClick={handleCancelGateEdit}>Cancel</button>}
       </div>
 
-      {gates.length === 0 ? <p>No gates found.</p> : (
-        <ul>
-          {gates.map(gate => (
+      {gates.length === 0 ? (
+        <p>No gates found.</p>
+      ) : (
+        <ul data-testid="gates-list">
+          {gates.map((gate) => (
             <li key={gate.id}>
               🪧 Gate: <strong>{gate.code}</strong>
               <button onClick={() => handleEditGate(gate)}>Edit</button>
@@ -273,16 +295,28 @@ const Admin = () => {
       <hr />
       <h2>Manage Airports</h2>
 
-      <div style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}>
+      <div
+        data-testid="airports-form"
+        style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}
+      >
         <h3>{editingAirportId ? "Edit Airport" : "Add New Airport"}</h3>
-        <input name="name" placeholder="Airport Name" value={airportForm.name} onChange={(e) => setAirportForm({ name: e.target.value })} />
-        <button onClick={handleAddOrUpdateAirport}>{editingAirportId ? "Update Airport" : "Add Airport"}</button>
+        <input
+          name="name"
+          placeholder="Airport Name"
+          value={airportForm.name}
+          onChange={(e) => setAirportForm({ name: e.target.value })}
+        />
+        <button onClick={handleAddOrUpdateAirport}>
+          {editingAirportId ? "Update Airport" : "Add Airport"}
+        </button>
         {editingAirportId && <button onClick={handleCancelAirportEdit}>Cancel</button>}
       </div>
 
-      {airports.length === 0 ? <p>No airports found.</p> : (
-        <ul>
-          {airports.map(airport => (
+      {airports.length === 0 ? (
+        <p>No airports found.</p>
+      ) : (
+        <ul data-testid="airports-list">
+          {airports.map((airport) => (
             <li key={airport.id}>
               🛫 Airport: <strong>{airport.name}</strong>
               <button onClick={() => handleEditAirport(airport)}>Edit</button>
