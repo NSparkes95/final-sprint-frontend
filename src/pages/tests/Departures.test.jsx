@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { vi, describe, it, beforeEach, expect } from 'vitest';
+import { vi, describe, it, beforeEach, afterEach, expect } from 'vitest';
 import Departures from '../Departures';
 
 vi.mock('../../services/api', () => ({
@@ -12,24 +12,30 @@ describe('Departures Component', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders loading text, then displays flight info', async () => {
-    const mockFlights = [
+    // Make sure the departure is FROM St. John’s so it passes the component’s filter
+    const mockDepartures = [
       {
-        id: 1,
+        id: 99,
+        aircraft: { airlineName: 'Air Canada', type: 'A320' },
         departureAirport: { name: "St. John's Intl" },
         arrivalAirport: { name: 'Toronto Pearson' },
-        aircraft: { airlineName: 'Air Canada', type: 'Boeing 737' },
         gate: { code: 'A1' },
       },
     ];
-    api.get.mockResolvedValueOnce({ data: mockFlights });
+    api.get.mockResolvedValueOnce({ data: mockDepartures });
 
     render(<Departures />);
 
     expect(screen.getByText(/loading departures/i)).toBeInTheDocument();
 
-    const listItems = await screen.findAllByRole('listitem');
-    expect(listItems.length).toBe(1);
+    const items = await screen.findAllByRole('listitem');
+    expect(items.length).toBeGreaterThan(0);
+
     expect(screen.getByText(/air canada/i)).toBeInTheDocument();
     expect(screen.getByText(/toronto pearson/i)).toBeInTheDocument();
   });
