@@ -1,48 +1,109 @@
-import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
-import Admin from "../Admin";
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { vi, describe, it, beforeEach, afterEach, expect } from 'vitest';
+import Admin from '../Admin';
 
-describe("Admin Component", () => {
-  it("renders Admin title", () => {
-    render(<Admin />);
-    expect(screen.getByText(/Admin Panel/i)).toBeInTheDocument();
+vi.mock('../../services/api', () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+}));
+import api from '../../services/api';
+
+const mockFlights = [
+  {
+    id: 1,
+    aircraft: { airlineName: 'Air Canada', type: 'A320' },
+    departureAirport: { name: 'Toronto Pearson' },
+    arrivalAirport: { name: "St. John's Intl" },
+    gate: { code: 'A1' },
+  },
+];
+const mockGates = [{ id: 1, code: 'A1' }, { id: 2, code: 'B2' }];
+const mockAirports = [
+  { id: 1, name: "St. John's Intl" },
+  { id: 2, name: 'Toronto Pearson' },
+];
+
+describe('Admin Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    api.get.mockImplementation((url) => {
+      if (url === '/flights') return Promise.resolve({ data: mockFlights });
+      if (url === '/gates') return Promise.resolve({ data: mockGates });
+      if (url === '/airports') return Promise.resolve({ data: mockAirports });
+      return Promise.resolve({ data: [] });
+    });
   });
 
-  it("renders flight form fields", () => {
-    render(<Admin />);
-    expect(screen.getByPlaceholderText(/Airline Name/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Aircraft Type/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Departure Airport/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Arrival Airport/i)).toBeInTheDocument();
-    
-    const gateCodeInputs = screen.getAllByPlaceholderText(/Gate Code/i);
-    expect(gateCodeInputs.length).toBeGreaterThanOrEqual(2);
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("renders flight form buttons", () => {
+  it('renders sections and initial data without network errors', async () => {
     render(<Admin />);
-    expect(screen.getByText(/Add Flight/i)).toBeInTheDocument();
+
+    // flights present
+    await screen.findByText(/Air Canada/i);
+    await screen.findByText(/Gate:\s*A1/i);
+
+    // airports present
+    const airportsList = await screen.findByTestId('airports-list');
+    const items = within(airportsList).getAllByRole('listitem');
+    expect(items.some(li => /St\. John's Intl/i.test(li.textContent || ''))).toBe(true);
+
+    expect(api.get).toHaveBeenCalledWith('/flights');
+    expect(api.get).toHaveBeenCalledWith('/gates');
+    expect(api.get).toHaveBeenCalledWith('/airports');
   });
 
-  it("renders gate section title", () => {
+  it('creates a new flight (POST /flights)', async () => {
     render(<Admin />);
-    expect(screen.getByText(/Manage Gates/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Airline Name/i), { target: { value: 'Test Airline' } });
+    fireEvent.change(screen.getByPlaceholderText(/Aircraft Type/i), { target: { value: 'A321' } });
+    fireEvent.change(screen.getByPlaceholderText(/Departure Airport/i), { target: { value: 'Toronto Pearson' } });
+    fireEvent.change(screen.getByPlaceholderText(/Arrival Airport/i), { target: { value: "St. John's Intl" } });
+    fireEvent.change(screen.getByTestId('flight-gateCode'), { target: { value: 'B2' } });
+
+    fireEvent.click(screen.getByText(/Add Flight/i));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/flights',
+        expect.objectContaining({ gate: { code: 'B2' } })
+      );
+    });
   });
 
-  it("renders gate form input and button", () => {
+  it('creates a new gate (POST /gates)', async () => {
     render(<Admin />);
-    expect(screen.getAllByPlaceholderText(/Gate Code/i).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText(/Add Gate/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('gate-code'), { target: { value: 'C3' } });
+    fireEvent.click(screen.getByText(/Add Gate/i));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/gates', { code: 'C3' });
+    });
   });
 
-  it("renders airport section title", () => {
+  it('creates a new airport (POST /airports)', async () => {
     render(<Admin />);
-    expect(screen.getByText(/Manage Airports/i)).toBeInTheDocument();
+    const airportInput = screen.getByPlaceholderText(/Airport Name/i);
+    fireEvent.change(airportInput, { target: { value: 'Halifax' } });
+    fireEvent.click(screen.getByText(/Add Airport/i));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/airports', { name: 'Halifax' });
+    });
   });
 
-  it("renders airport form input and button", () => {
+  it('deletes a gate (DELETE /gates/:id)', async () => {
     render(<Admin />);
-    expect(screen.getByPlaceholderText(/Airport Name/i)).toBeInTheDocument();
-    expect(screen.getByText(/Add Airport/i)).toBeInTheDocument();
+
+    const gatesList = await screen.findByTestId('gates-list');
+    const deleteButtons = within(gatesList).getAllByText(/Delete/i);
+    fireEvent.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(api.delete).toHaveBeenCalledWith('/gates/1');
+    });
   });
 });
