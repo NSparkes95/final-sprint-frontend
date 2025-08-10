@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
 import api from "../services/api";
+import {
+  normalizeFlight,
+  normalizeGate,
+  normalizeAirport,
+} from "../services/transformers";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isTest = import.meta?.env?.MODE === "test";
@@ -32,7 +37,10 @@ const Admin = () => {
       setIsLoading(true);
       if (!isTest) await sleep(500); // don’t slow tests
       const response = await api.get("/flights");
-      setFlights(response.data);
+      const normalized = (response?.data ?? [])
+        .map(normalizeFlight)
+        .filter(Boolean);
+      setFlights(normalized);
       setError(null);
     } catch (err) {
       console.error("Error fetching flights:", err);
@@ -46,7 +54,10 @@ const Admin = () => {
   const fetchGates = async () => {
     try {
       const res = await api.get("/gates");
-      setGates(res.data);
+      const normalized = (res?.data ?? [])
+        .map(normalizeGate)
+        .filter(Boolean);
+      setGates(normalized);
     } catch (err) {
       console.error("Error fetching gates:", err);
       setError("Failed to fetch gates.");
@@ -57,7 +68,10 @@ const Admin = () => {
   const fetchAirports = async () => {
     try {
       const res = await api.get("/airports");
-      setAirports(res.data);
+      const normalized = (res?.data ?? [])
+        .map(normalizeAirport)
+        .filter(Boolean);
+      setAirports(normalized);
     } catch (err) {
       console.error("Error fetching airports:", err);
       setError("Failed to fetch airports.");

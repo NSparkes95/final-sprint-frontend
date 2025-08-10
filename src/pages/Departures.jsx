@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
+import { normalizeFlight } from '../services/transformers';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isTest = import.meta?.env?.MODE === 'test';
@@ -14,11 +15,18 @@ const Departures = () => {
       try {
         setIsLoading(true);
         if (!isTest) await sleep(1000);
+
         const res = await api.get('/flights');
-        const data = res.data || [];
-        const filtered = data.filter(
+        const data = Array.isArray(res?.data) ? res.data : [];
+
+        // Normalize all flights first
+        const normalized = data.map(normalizeFlight);
+
+        // Filter for flights leaving from St. John's Intl
+        const filtered = normalized.filter(
           (f) => f.departureAirport?.name === "St. John's Intl"
         );
+
         setDepartures(filtered);
         setError(null);
       } catch (err) {
@@ -28,6 +36,7 @@ const Departures = () => {
         setIsLoading(false);
       }
     };
+
     fetchDepartures();
   }, []);
 
@@ -43,8 +52,8 @@ const Departures = () => {
           {departures.map((flight) => (
             <li key={flight.id}>
               ✈️ <strong>{flight.aircraft?.airlineName || 'Unknown Airline'}</strong>
-              from <strong>{flight.departureAirport?.name || 'Unknown'}</strong>
-              to <strong>{flight.arrivalAirport?.name || 'Unknown'}</strong>
+              {' '}from <strong>{flight.departureAirport?.name || 'Unknown'}</strong>
+              {' '}to <strong>{flight.arrivalAirport?.name || 'Unknown'}</strong>
               <br />
               Gate: {flight.gate?.code || 'TBD'} | Type: {flight.aircraft?.type || 'Unknown'}
             </li>
