@@ -23,14 +23,14 @@ export default function Arrivals() {
         setError(null);
         if (!isTest) await sleep(1000); // keep UX delay but skip in tests
 
-        // Dedicated /arrivals endpoint with optional airportId filter
-        const res = await api.get('/arrivals', {
-          params: airportId ? { airportId } : {},
-        });
-
+        const res = await api.get('/flights');
         const data = Array.isArray(res?.data) ? res.data : [];
-        const normalized = data.map(normalizeFlight).filter(Boolean);
 
+        const filtered = airportId
+          ? data.filter(f => String(f?.arrivalAirport?.id ?? '') === String(airportId))
+          : data;
+
+        const normalized = filtered.map(normalizeFlight).filter(Boolean);
         setArrivals(normalized);
       } catch (err) {
         console.error('Error fetching arrivals:', err);
@@ -56,7 +56,7 @@ export default function Arrivals() {
       {!isLoading && !error && arrivals.length > 0 && (
         <ul className="flight-list" role="list">
           {arrivals.map((flight) => {
-            const statusText = flight.status || 'On Time'; // fallback if no status from API
+            const statusText = flight.status || 'On Time';
             const statusClass = `status ${statusText.toLowerCase().replace(/\s+/g, '-')}`;
 
             return (
