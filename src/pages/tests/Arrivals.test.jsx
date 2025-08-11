@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { vi, describe, it, beforeEach, afterEach, expect } from 'vitest';
 import Arrivals from '../Arrivals';
 
@@ -14,16 +15,21 @@ import { mockFlights } from '../../__mocks__/mockData';
 describe('Arrivals Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Arrivals does one GET for flights
-    api.get.mockResolvedValueOnce({ data: mockFlights });
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders loading text, then displays flight info', async () => {
-    render(<Arrivals />);
+  it('renders loading text, then displays flight info for selected airport', async () => {
+    // Arrivals now fetches /arrivals with ?airportId=...
+    api.get.mockResolvedValueOnce({ data: mockFlights });
+
+    render(
+      <MemoryRouter initialEntries={['/?airportId=123']}>
+        <Arrivals />
+      </MemoryRouter>
+    );
 
     // shows loading first
     expect(screen.getByText(/loading arrivals/i)).toBeInTheDocument();
@@ -35,5 +41,20 @@ describe('Arrivals Component', () => {
     // a couple of sanity checks against our mock data
     expect(screen.getByText(/air canada/i)).toBeInTheDocument();
     expect(screen.getByText(/st\. john's intl/i)).toBeInTheDocument();
+
+    // ensure API is called with correct endpoint + params
+    expect(api.get).toHaveBeenCalledWith('/arrivals', { params: { airportId: '123' } });
+  });
+
+  it('shows an error state if the API call fails', async () => {
+    api.get.mockRejectedValueOnce(new Error('boom'));
+
+    render(
+      <MemoryRouter initialEntries={['/?airportId=123']}>
+        <Arrivals />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText(/error fetching arrivals/i)).toBeInTheDocument();
   });
 });

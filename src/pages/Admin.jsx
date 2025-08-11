@@ -9,33 +9,39 @@ import {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isTest = import.meta?.env?.MODE === "test";
 
-const Admin = () => {
+export default function Admin() {
   const [flights, setFlights] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [editingFlightId, setEditingFlightId] = useState(null);
 
+  // Flight form
   const [form, setForm] = useState({
     airlineName: "",
     type: "",
-    departureAirport: "",
-    arrivalAirport: "",
-    gateCode: "",
+    departureAirportId: "",
+    arrivalAirportId: "",
+    gateId: "",
   });
 
+  // Lookup lists
   const [gates, setGates] = useState([]);
+  const [airports, setAirports] = useState([]);
+
+  // Simple Gate CRUD
   const [gateForm, setGateForm] = useState({ code: "" });
   const [editingGateId, setEditingGateId] = useState(null);
 
-  const [airports, setAirports] = useState([]);
+  // Simple Airport CRUD
   const [airportForm, setAirportForm] = useState({ name: "" });
   const [editingAirportId, setEditingAirportId] = useState(null);
 
-  // Flights
+  // ===== Fetchers =====
   const fetchFlights = async () => {
     try {
       setIsLoading(true);
-      if (!isTest) await sleep(500); // don’t slow tests
+      if (!isTest) await sleep(500);
       const response = await api.get("/flights");
       const normalized = (response?.data ?? [])
         .map(normalizeFlight)
@@ -50,13 +56,10 @@ const Admin = () => {
     }
   };
 
-  // Gates
   const fetchGates = async () => {
     try {
       const res = await api.get("/gates");
-      const normalized = (res?.data ?? [])
-        .map(normalizeGate)
-        .filter(Boolean);
+      const normalized = (res?.data ?? []).map(normalizeGate).filter(Boolean);
       setGates(normalized);
     } catch (err) {
       console.error("Error fetching gates:", err);
@@ -64,7 +67,6 @@ const Admin = () => {
     }
   };
 
-  // Airports
   const fetchAirports = async () => {
     try {
       const res = await api.get("/airports");
@@ -84,58 +86,80 @@ const Admin = () => {
     fetchAirports();
   }, []);
 
-  // FLIGHT CRUD
+  // ===== Flight CRUD =====
   const handleInputChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
   };
 
   const handleAddOrUpdateFlight = async () => {
+    // Build payload expected by backend.
     const flightData = {
       aircraft: {
         airlineName: form.airlineName,
         type: form.type,
       },
-      departureAirport: { name: form.departureAirport },
-      arrivalAirport: { name: form.arrivalAirport },
-      gate: { code: form.gateCode },
+      departureAirportId: form.departureAirportId || null,
+      arrivalAirportId: form.arrivalAirportId || null,
+      gateId: form.gateId || null,
     };
 
+    // Basic client-side validation
+    if (!flightData.aircraft.airlineName || !flightData.aircraft.type) {
+      setError("Please provide airline name and aircraft type.");
+      return;
+    }
+    if (!flightData.departureAirportId || !flightData.arrivalAirportId) {
+      setError("Please select both departure and arrival airports.");
+      return;
+    }
+
     try {
+      setSaving(true);
       if (editingFlightId) {
         await api.put(`/flights/${editingFlightId}`, flightData);
       } else {
         await api.post("/flights", flightData);
       }
+      // Reset
       setForm({
         airlineName: "",
         type: "",
-        departureAirport: "",
-        arrivalAirport: "",
-        gateCode: "",
+        departureAirportId: "",
+        arrivalAirportId: "",
+        gateId: "",
       });
       setEditingFlightId(null);
-      fetchFlights();
+      await fetchFlights();
+      setError(null);
     } catch (err) {
       console.error("Error saving flight:", err);
       setError("Failed to save flight. Please check your input.");
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleEditFlight = (flight) => {
+    // Try to match existing names/codes to IDs from lookup lists
+    const dep = airports.find((a) => a.name === flight?.departureAirport?.name);
+    const arr = airports.find((a) => a.name === flight?.arrivalAirport?.name);
+    const g = gates.find((g) => g.code === flight?.gate?.code);
+
     setEditingFlightId(flight.id);
     setForm({
       airlineName: flight.aircraft?.airlineName || "",
       type: flight.aircraft?.type || "",
-      departureAirport: flight.departureAirport?.name || "",
-      arrivalAirport: flight.arrivalAirport?.name || "",
-      gateCode: flight.gate?.code || "",
+      departureAirportId: dep?.id || "",
+      arrivalAirportId: arr?.id || "",
+      gateId: g?.id || "",
     });
   };
 
   const handleDeleteFlight = async (id) => {
     try {
       await api.delete(`/flights/${id}`);
-      fetchFlights();
+      await fetchFlights();
     } catch (err) {
       console.error("Error deleting flight:", err);
       setError("Failed to delete flight.");
@@ -147,13 +171,13 @@ const Admin = () => {
     setForm({
       airlineName: "",
       type: "",
-      departureAirport: "",
-      arrivalAirport: "",
-      gateCode: "",
+      departureAirportId: "",
+      arrivalAirportId: "",
+      gateId: "",
     });
   };
 
-  // GATE CRUD
+  // ===== Gate CRUD =====
   const handleAddOrUpdateGate = async () => {
     try {
       if (editingGateId) {
@@ -190,7 +214,7 @@ const Admin = () => {
     setGateForm({ code: "" });
   };
 
-  // AIRPORT CRUD
+  // ===== Airport CRUD =====
   const handleAddOrUpdateAirport = async () => {
     try {
       if (editingAirportId) {
@@ -237,15 +261,82 @@ const Admin = () => {
         style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}
       >
         <h3>{editingFlightId ? "Edit Flight" : "Add New Flight"}</h3>
-        <input name="airlineName" placeholder="Airline Name" value={form.airlineName} onChange={handleInputChange} />
-        <input name="type" placeholder="Aircraft Type" value={form.type} onChange={handleInputChange} />
-        <input name="departureAirport" placeholder="Departure Airport" value={form.departureAirport} onChange={handleInputChange} />
-        <input name="arrivalAirport" placeholder="Arrival Airport" value={form.arrivalAirport} onChange={handleInputChange} />
-        <input name="gateCode" placeholder="Gate Code" data-testid="flight-gateCode" value={form.gateCode} onChange={handleInputChange} />
-        <button onClick={handleAddOrUpdateFlight}>
-          {editingFlightId ? "Update Flight" : "Add Flight"}
-        </button>
-        {editingFlightId && <button onClick={handleCancelEdit}>Cancel</button>}
+
+        <input
+          name="airlineName"
+          placeholder="Airline Name"
+          value={form.airlineName}
+          onChange={handleInputChange}
+        />
+        <input
+          name="type"
+          placeholder="Aircraft Type"
+          value={form.type}
+          onChange={handleInputChange}
+        />
+
+        {/* Departure Airport (select) */}
+        <label style={{ display: "block", marginTop: 8 }}>
+          Departure Airport:
+          <select
+            name="departureAirportId"
+            value={form.departureAirportId}
+            onChange={handleInputChange}
+          >
+            <option value="">-- Select --</option>
+            {airports.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.code ? `${a.code} — ${a.name}` : a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Arrival Airport (select) */}
+        <label style={{ display: "block", marginTop: 8 }}>
+          Arrival Airport:
+          <select
+            name="arrivalAirportId"
+            value={form.arrivalAirportId}
+            onChange={handleInputChange}
+          >
+            <option value="">-- Select --</option>
+            {airports.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.code ? `${a.code} — ${a.name}` : a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Gate (select) */}
+        <label style={{ display: "block", marginTop: 8 }}>
+          Gate:
+          <select
+            name="gateId"
+            value={form.gateId}
+            onChange={handleInputChange}
+            data-testid="flight-gateCode" // keep test id so your tests still pass
+          >
+            <option value="">-- Select --</option>
+            {gates.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.code}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <button onClick={handleAddOrUpdateFlight} disabled={saving}>
+            {editingFlightId ? "Update Flight" : "Add Flight"}
+          </button>
+          {editingFlightId && (
+            <button onClick={handleCancelEdit} disabled={saving}>
+              Cancel
+            </button>
+          )}
+        </div>
       </div>
 
       {isLoading && <p>Loading all flights...</p>}
@@ -340,6 +431,4 @@ const Admin = () => {
       )}
     </div>
   );
-};
-
-export default Admin;
+}

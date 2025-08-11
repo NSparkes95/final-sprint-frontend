@@ -56,5 +56,6 @@ export function normalizeAirport(raw) {
   return {
     id: raw.id ?? raw.airportId ?? raw._id ?? null,
     name: raw.name ?? raw.airportName ?? String(raw),
+    code: raw.code ?? raw.airportCode ?? raw.iata ?? raw.icao ?? '', // NEW
   };
 }
