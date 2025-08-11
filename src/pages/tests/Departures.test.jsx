@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { vi, describe, it, beforeEach, afterEach, expect } from 'vitest';
 import Departures from '../Departures';
 
@@ -16,8 +17,7 @@ describe('Departures Component', () => {
     vi.clearAllMocks();
   });
 
-  it('renders loading text, then displays flight info', async () => {
-    // Make sure the departure is FROM St. John’s so it passes the component’s filter
+  it('renders loading text, then displays flight info for selected airport', async () => {
     const mockDepartures = [
       {
         id: 99,
@@ -29,7 +29,11 @@ describe('Departures Component', () => {
     ];
     api.get.mockResolvedValueOnce({ data: mockDepartures });
 
-    render(<Departures />);
+    render(
+      <MemoryRouter initialEntries={['/departures?airportId=123']}>
+        <Departures />
+      </MemoryRouter>
+    );
 
     expect(screen.getByText(/loading departures/i)).toBeInTheDocument();
 
@@ -38,5 +42,20 @@ describe('Departures Component', () => {
 
     expect(screen.getByText(/air canada/i)).toBeInTheDocument();
     expect(screen.getByText(/toronto pearson/i)).toBeInTheDocument();
+
+    // verify correct endpoint + params
+    expect(api.get).toHaveBeenCalledWith('/departures', { params: { airportId: '123' } });
+  });
+
+  it('shows an error state when the API fails', async () => {
+    api.get.mockRejectedValueOnce(new Error('boom'));
+
+    render(
+      <MemoryRouter initialEntries={['/departures?airportId=123']}>
+        <Departures />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText(/error fetching departures/i)).toBeInTheDocument();
   });
 });
