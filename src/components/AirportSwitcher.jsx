@@ -12,15 +12,28 @@ export default function AirportSwitcher() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const currentId = searchParams.get('airportId') || localStorage.getItem('airportId') || '';
+  // Empty string === "All airports"
+  const currentId =
+    searchParams.get('airportId') ?? localStorage.getItem('airportId') ?? '';
 
-  const handleChange = useCallback((nextId) => {
-    const params = new URLSearchParams(location.search);
-    if (nextId) params.set('airportId', String(nextId));
-    else params.delete('airportId');
-    localStorage.setItem('airportId', String(nextId || ''));
-    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
-  }, [location.pathname, location.search, navigate]);
+  const handleChange = useCallback(
+    (nextId) => {
+      const params = new URLSearchParams(location.search);
+
+      if (nextId) {
+        params.set('airportId', String(nextId));
+        localStorage.setItem('airportId', String(nextId));
+      } else {
+        // "All airports" -> clear filter from URL and storage
+        params.delete('airportId');
+        localStorage.removeItem('airportId');
+      }
+
+      const qs = params.toString();
+      navigate(`${location.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
+    },
+    [location.pathname, location.search, navigate]
+  );
 
   useEffect(() => {
     (async () => {
@@ -30,9 +43,7 @@ export default function AirportSwitcher() {
         const res = await api.get('/airports');
         const list = (res?.data ?? []).map(normalizeAirport).filter(Boolean);
         setAirports(list);
-        if (!currentId && list.length) {
-          handleChange(list[0].id);
-        }
+        // No auto-select; leave as "All" unless user picks one
       } catch (e) {
         console.error(e);
         setError('Failed to load airports.');
@@ -40,7 +51,7 @@ export default function AirportSwitcher() {
         setLoading(false);
       }
     })();
-  }, [currentId, handleChange]);
+  }, []);
 
   if (error) return <div role="alert" className="status error">{error}</div>;
 
@@ -54,8 +65,9 @@ export default function AirportSwitcher() {
           onChange={(e) => handleChange(e.target.value)}
           disabled={loading || airports.length === 0}
         >
-          {!currentId && <option value="">-- Select --</option>}
-          {airports.map(a => (
+          {/* All airports option */}
+          <option value="">All airports</option>
+          {airports.map((a) => (
             <option key={a.id} value={a.id}>
               {a.code ? `${a.code} — ${a.name}` : a.name}
             </option>
