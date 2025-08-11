@@ -23,7 +23,7 @@ export default function Arrivals() {
         setError(null);
         if (!isTest) await sleep(1000); // keep UX delay but skip in tests
 
-        // Preferred: dedicated /arrivals endpoint with optional airportId param
+        // Dedicated /arrivals endpoint with optional airportId filter
         const res = await api.get('/arrivals', {
           params: airportId ? { airportId } : {},
         });
@@ -44,23 +44,39 @@ export default function Arrivals() {
   }, [airportId]);
 
   return (
-    <div>
+    <div className="container">
       <h2>Arrivals</h2>
-      {isLoading && <p>Loading arrivals...</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {!isLoading && !error && arrivals.length === 0 && <p>No arrivals found.</p>}
+
+      {isLoading && <p className="loading">Loading arrivals...</p>}
+      {error && <p className="status error">{error}</p>}
+      {!isLoading && !error && arrivals.length === 0 && (
+        <p className="empty">No arrivals found.</p>
+      )}
 
       {!isLoading && !error && arrivals.length > 0 && (
-        <ul role="list">
-          {arrivals.map((flight) => (
-            <li role="listitem" key={flight.id}>
-              ✈️ <strong>{flight.aircraft?.airlineName || 'Unknown Airline'}</strong>{' '}
-              from <strong>{flight.departureAirport?.name || 'Unknown'}</strong>{' '}
-              to <strong>{flight.arrivalAirport?.name || 'Unknown'}</strong>
-              <br />
-              Gate: {flight.gate?.code || 'TBD'} | Type: {flight.aircraft?.type || 'Unknown'}
-            </li>
-          ))}
+        <ul className="flight-list" role="list">
+          {arrivals.map((flight) => {
+            const statusText = flight.status || 'On Time'; // fallback if no status from API
+            const statusClass = `status ${statusText.toLowerCase().replace(/\s+/g, '-')}`;
+
+            return (
+              <li role="listitem" key={flight.id}>
+                <div className="flight-header">
+                  <span>
+                    ✈️ <strong>{flight.aircraft?.airlineName || 'Unknown Airline'}</strong>{' '}
+                    ({flight.aircraft?.type || 'Unknown'})
+                  </span>
+                  <span className={statusClass}>{statusText}</span>
+                </div>
+
+                <div className="flight-info">
+                  From <strong>{flight.departureAirport?.name || 'Unknown'}</strong>{' '}
+                  to <strong>{flight.arrivalAirport?.name || 'Unknown'}</strong>{' '}
+                  — Gate {flight.gate?.code || 'TBD'}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

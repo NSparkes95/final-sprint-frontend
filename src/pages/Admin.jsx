@@ -25,7 +25,7 @@ export default function Admin() {
     gateId: "",
   });
 
-  // Lookup lists
+  // Lookups
   const [gates, setGates] = useState([]);
   const [airports, setAirports] = useState([]);
 
@@ -43,9 +43,7 @@ export default function Admin() {
       setIsLoading(true);
       if (!isTest) await sleep(500);
       const response = await api.get("/flights");
-      const normalized = (response?.data ?? [])
-        .map(normalizeFlight)
-        .filter(Boolean);
+      const normalized = (response?.data ?? []).map(normalizeFlight).filter(Boolean);
       setFlights(normalized);
       setError(null);
     } catch (err) {
@@ -70,9 +68,7 @@ export default function Admin() {
   const fetchAirports = async () => {
     try {
       const res = await api.get("/airports");
-      const normalized = (res?.data ?? [])
-        .map(normalizeAirport)
-        .filter(Boolean);
+      const normalized = (res?.data ?? []).map(normalizeAirport).filter(Boolean);
       setAirports(normalized);
     } catch (err) {
       console.error("Error fetching airports:", err);
@@ -93,7 +89,6 @@ export default function Admin() {
   };
 
   const handleAddOrUpdateFlight = async () => {
-    // Build payload expected by backend.
     const flightData = {
       aircraft: {
         airlineName: form.airlineName,
@@ -104,7 +99,6 @@ export default function Admin() {
       gateId: form.gateId || null,
     };
 
-    // Basic client-side validation
     if (!flightData.aircraft.airlineName || !flightData.aircraft.type) {
       setError("Please provide airline name and aircraft type.");
       return;
@@ -121,7 +115,6 @@ export default function Admin() {
       } else {
         await api.post("/flights", flightData);
       }
-      // Reset
       setForm({
         airlineName: "",
         type: "",
@@ -141,7 +134,6 @@ export default function Admin() {
   };
 
   const handleEditFlight = (flight) => {
-    // Try to match existing names/codes to IDs from lookup lists
     const dep = airports.find((a) => a.name === flight?.departureAirport?.name);
     const arr = airports.find((a) => a.name === flight?.arrivalAirport?.name);
     const g = gates.find((g) => g.code === flight?.gate?.code);
@@ -252,82 +244,87 @@ export default function Admin() {
   };
 
   return (
-    <div>
+    <div className="container">
       <h2>Admin Panel – All Flights</h2>
 
       {/* Flight Form */}
-      <div
-        data-testid="flight-form"
-        style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}
-      >
+      <div data-testid="flight-form" className="panel stack" style={{ marginBottom: 16 }}>
         <h3>{editingFlightId ? "Edit Flight" : "Add New Flight"}</h3>
 
-        <input
-          name="airlineName"
-          placeholder="Airline Name"
-          value={form.airlineName}
-          onChange={handleInputChange}
-        />
-        <input
-          name="type"
-          placeholder="Aircraft Type"
-          value={form.type}
-          onChange={handleInputChange}
-        />
+        <div className="row">
+          <label>
+            Airline:
+            <input
+              name="airlineName"
+              placeholder="Airline Name"
+              value={form.airlineName}
+              onChange={handleInputChange}
+            />
+          </label>
 
-        {/* Departure Airport (select) */}
-        <label style={{ display: "block", marginTop: 8 }}>
-          Departure Airport:
-          <select
-            name="departureAirportId"
-            value={form.departureAirportId}
-            onChange={handleInputChange}
-          >
-            <option value="">-- Select --</option>
-            {airports.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code ? `${a.code} — ${a.name}` : a.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label>
+            Aircraft:
+            <input
+              name="type"
+              placeholder="Aircraft Type"
+              value={form.type}
+              onChange={handleInputChange}
+            />
+          </label>
+        </div>
 
-        {/* Arrival Airport (select) */}
-        <label style={{ display: "block", marginTop: 8 }}>
-          Arrival Airport:
-          <select
-            name="arrivalAirportId"
-            value={form.arrivalAirportId}
-            onChange={handleInputChange}
-          >
-            <option value="">-- Select --</option>
-            {airports.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.code ? `${a.code} — ${a.name}` : a.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="row">
+          <label>
+            Departure:
+            <select
+              name="departureAirportId"
+              value={form.departureAirportId}
+              onChange={handleInputChange}
+            >
+              <option value="">-- Select --</option>
+              {airports.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.code ? `${a.code} — ${a.name}` : a.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        {/* Gate (select) */}
-        <label style={{ display: "block", marginTop: 8 }}>
-          Gate:
-          <select
-            name="gateId"
-            value={form.gateId}
-            onChange={handleInputChange}
-            data-testid="flight-gateCode" // keep test id so your tests still pass
-          >
-            <option value="">-- Select --</option>
-            {gates.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.code}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label>
+            Arrival:
+            <select
+              name="arrivalAirportId"
+              value={form.arrivalAirportId}
+              onChange={handleInputChange}
+            >
+              <option value="">-- Select --</option>
+              {airports.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.code ? `${a.code} — ${a.name}` : a.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <label>
+            Gate:
+            <select
+              name="gateId"
+              value={form.gateId}
+              onChange={handleInputChange}
+              data-testid="flight-gateCode"
+            >
+              <option value="">-- Select --</option>
+              {gates.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.code}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="row" style={{ marginTop: 6 }}>
           <button onClick={handleAddOrUpdateFlight} disabled={saving}>
             {editingFlightId ? "Update Flight" : "Add Flight"}
           </button>
@@ -337,94 +334,126 @@ export default function Admin() {
             </button>
           )}
         </div>
+
+        {error && <p className="status error">{error}</p>}
       </div>
 
-      {isLoading && <p>Loading all flights...</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      {!isLoading && !error && flights.length === 0 && <p>No flights found.</p>}
+      {isLoading && <p className="loading">Loading all flights...</p>}
+      {!isLoading && !error && flights.length === 0 && (
+        <p className="empty">No flights found.</p>
+      )}
 
       {!isLoading && !error && flights.length > 0 && (
-        <ul data-testid="flights-list">
+        <ul data-testid="flights-list" className="flight-list" role="list">
           {flights.map((flight) => (
-            <li key={flight.id} style={{ marginBottom: "0.5rem" }}>
-              ✈️ <strong>{flight.aircraft?.airlineName || "Unknown Airline"}</strong>{" "}
-              from <strong>{flight.departureAirport?.name || "Unknown"}</strong>{" "}
-              to <strong>{flight.arrivalAirport?.name || "Unknown"}</strong>
-              <br />
-              Gate: {flight.gate?.code || "TBD"} | Type: {flight.aircraft?.type || "Unknown"}{" "}
-              <button onClick={() => handleEditFlight(flight)}>Edit</button>
-              <button onClick={() => handleDeleteFlight(flight.id)}>Delete</button>
+            <li role="listitem" key={flight.id}>
+              <div className="flight-header">
+                <span>
+                  ✈️ <strong>{flight.aircraft?.airlineName || "Unknown Airline"}</strong>{" "}
+                  ({flight.aircraft?.type || "Unknown"})
+                </span>
+                <span className={`status ${(flight.status || "On Time").toLowerCase().replace(/\s+/g, "-")}`}>
+                  {flight.status || "On Time"}
+                </span>
+              </div>
+              <div className="flight-info">
+                From <strong>{flight.departureAirport?.name || "Unknown"}</strong>{" "}
+                to <strong>{flight.arrivalAirport?.name || "Unknown"}</strong> — Gate{" "}
+                {flight.gate?.code || "TBD"}
+              </div>
+              <div className="row" style={{ marginTop: 8 }}>
+                <button onClick={() => handleEditFlight(flight)}>Edit</button>
+                <button onClick={() => handleDeleteFlight(flight.id)}>Delete</button>
+              </div>
             </li>
           ))}
         </ul>
       )}
 
       {/* GATE CRUD SECTION */}
-      <hr />
+      <hr style={{ margin: "20px 0", borderColor: "var(--color-border)" }} />
       <h2>Manage Gates</h2>
 
-      <div
-        data-testid="gates-form"
-        style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}
-      >
+      <div data-testid="gates-form" className="panel stack" style={{ marginBottom: 12 }}>
         <h3>{editingGateId ? "Edit Gate" : "Add New Gate"}</h3>
-        <input
-          name="code"
-          placeholder="Gate Code"
-          data-testid="gate-code"
-          value={gateForm.code}
-          onChange={(e) => setGateForm({ code: e.target.value })}
-        />
-        <button onClick={handleAddOrUpdateGate}>
-          {editingGateId ? "Update Gate" : "Add Gate"}
-        </button>
-        {editingGateId && <button onClick={handleCancelGateEdit}>Cancel</button>}
+        <div className="row">
+          <label>
+            Code:
+            <input
+              name="code"
+              placeholder="Gate Code"
+              data-testid="gate-code"
+              value={gateForm.code}
+              onChange={(e) => setGateForm({ code: e.target.value })}
+            />
+          </label>
+          <div className="row">
+            <button onClick={handleAddOrUpdateGate}>
+              {editingGateId ? "Update Gate" : "Add Gate"}
+            </button>
+            {editingGateId && <button onClick={handleCancelGateEdit}>Cancel</button>}
+          </div>
+        </div>
       </div>
 
       {gates.length === 0 ? (
-        <p>No gates found.</p>
+        <p className="empty">No gates found.</p>
       ) : (
-        <ul data-testid="gates-list">
+        <ul data-testid="gates-list" className="flight-list" role="list">
           {gates.map((gate) => (
-            <li key={gate.id}>
-              🪧 Gate: <strong>{gate.code}</strong>
-              <button onClick={() => handleEditGate(gate)}>Edit</button>
-              <button onClick={() => handleDeleteGate(gate.id)}>Delete</button>
+            <li role="listitem" key={gate.id}>
+              <div className="flight-header">
+                <span>🪧 Gate: <strong>{gate.code}</strong></span>
+                <div className="row">
+                  <button onClick={() => handleEditGate(gate)}>Edit</button>
+                  <button onClick={() => handleDeleteGate(gate.id)}>Delete</button>
+                </div>
+              </div>
             </li>
           ))}
         </ul>
       )}
 
       {/* AIRPORT CRUD SECTION */}
-      <hr />
+      <hr style={{ margin: "20px 0", borderColor: "var(--color-border)" }} />
       <h2>Manage Airports</h2>
 
-      <div
-        data-testid="airports-form"
-        style={{ border: "1px solid gray", padding: "1rem", marginBottom: "1rem" }}
-      >
+      <div data-testid="airports-form" className="panel stack" style={{ marginBottom: 12 }}>
         <h3>{editingAirportId ? "Edit Airport" : "Add New Airport"}</h3>
-        <input
-          name="name"
-          placeholder="Airport Name"
-          value={airportForm.name}
-          onChange={(e) => setAirportForm({ name: e.target.value })}
-        />
-        <button onClick={handleAddOrUpdateAirport}>
-          {editingAirportId ? "Update Airport" : "Add Airport"}
-        </button>
-        {editingAirportId && <button onClick={handleCancelAirportEdit}>Cancel</button>}
+        <div className="row">
+          <label>
+            Name:
+            <input
+              name="name"
+              placeholder="Airport Name"
+              value={airportForm.name}
+              onChange={(e) => setAirportForm({ name: e.target.value })}
+            />
+          </label>
+          <div className="row">
+            <button onClick={handleAddOrUpdateAirport}>
+              {editingAirportId ? "Update Airport" : "Add Airport"}
+            </button>
+            {editingAirportId && (
+              <button onClick={handleCancelAirportEdit}>Cancel</button>
+            )}
+          </div>
+        </div>
       </div>
 
       {airports.length === 0 ? (
-        <p>No airports found.</p>
+        <p className="empty">No airports found.</p>
       ) : (
-        <ul data-testid="airports-list">
+        <ul data-testid="airports-list" className="flight-list" role="list">
           {airports.map((airport) => (
-            <li key={airport.id}>
-              🛫 Airport: <strong>{airport.name}</strong>
-              <button onClick={() => handleEditAirport(airport)}>Edit</button>
-              <button onClick={() => handleDeleteAirport(airport.id)}>Delete</button>
+            <li role="listitem" key={airport.id}>
+              <div className="flight-header">
+                <span>🛫 Airport: <strong>{airport.name}</strong></span>
+                <div className="row">
+                  <button onClick={() => handleEditAirport(airport)}>Edit</button>
+                  <button onClick={() => handleDeleteAirport(airport.id)}>Delete</button>
+                </div>
+              </div>
             </li>
           ))}
         </ul>
