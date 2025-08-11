@@ -1,8 +1,7 @@
 export function normalizeFlight(raw) {
   if (!raw || typeof raw !== 'object') return null;
 
-  const id =
-    raw.id ?? raw.flightId ?? raw._id ?? null;
+  const id = raw.id ?? raw.flightId ?? raw._id ?? null;
 
   const aircraft = raw.aircraft ?? {
     airlineName: raw.airlineName ?? raw.airline ?? raw.carrier ?? 'Unknown Airline',
@@ -48,7 +47,7 @@ export function normalizeGate(raw) {
   if (!raw || typeof raw !== 'object') return null;
   return {
     id: raw.id ?? raw.gateId ?? raw._id ?? null,
-    code: raw.code ?? raw.gateCode ?? String(raw) ?? '',
+    code: raw.code ?? raw.gateCode ?? String(raw),
   };
 }
 
@@ -56,6 +55,6 @@ export function normalizeAirport(raw) {
   if (!raw || typeof raw !== 'object') return null;
   return {
     id: raw.id ?? raw.airportId ?? raw._id ?? null,
-    name: raw.name ?? raw.airportName ?? String(raw) ?? '',
+    name: raw.name ?? raw.airportName ?? String(raw),
   };
 }

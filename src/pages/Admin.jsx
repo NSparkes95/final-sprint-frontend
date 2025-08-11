@@ -82,7 +82,6 @@ const Admin = () => {
     fetchFlights();
     fetchGates();
     fetchAirports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // FLIGHT CRUD
