@@ -9,12 +9,25 @@ import {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isTest = import.meta?.env?.MODE === "test";
 
+const getErrMsg = (err, fallback) =>
+  err?.response?.data?.message ||
+  err?.response?.data?.error ||
+  (typeof err?.response?.data === "string" ? err.response.data : null) ||
+  err?.message ||
+  fallback;
+
 export default function Admin() {
   const [flights, setFlights] = useState([]);
+  const [gates, setGates] = useState([]);
+  const [airports, setAirports] = useState([]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
   const [editingFlightId, setEditingFlightId] = useState(null);
+  const [editingGateId, setEditingGateId] = useState(null);
+  const [editingAirportId, setEditingAirportId] = useState(null);
 
   // Flight form
   const [form, setForm] = useState({
@@ -25,30 +38,24 @@ export default function Admin() {
     gateId: "",
   });
 
-  // Lookups
-  const [gates, setGates] = useState([]);
-  const [airports, setAirports] = useState([]);
+  // Gate form (now includes airportId)
+  const [gateForm, setGateForm] = useState({ code: "", airportId: "" });
 
-  // Simple Gate CRUD
-  const [gateForm, setGateForm] = useState({ code: "" });
-  const [editingGateId, setEditingGateId] = useState(null);
-
-  // Simple Airport CRUD
+  // Airport form
   const [airportForm, setAirportForm] = useState({ name: "" });
-  const [editingAirportId, setEditingAirportId] = useState(null);
 
   // ===== Fetchers =====
   const fetchFlights = async () => {
     try {
       setIsLoading(true);
-      if (!isTest) await sleep(500);
-      const response = await api.get("/flights");
-      const normalized = (response?.data ?? []).map(normalizeFlight).filter(Boolean);
+      if (!isTest) await sleep(300);
+      const res = await api.get("/flights");
+      const normalized = (res?.data ?? []).map(normalizeFlight).filter(Boolean);
       setFlights(normalized);
       setError(null);
     } catch (err) {
-      console.error("Error fetching flights:", err);
-      setError("Error fetching flights. Please try again later.");
+      console.error(err);
+      setError(getErrMsg(err, "Error fetching flights. Please try again later."));
     } finally {
       setIsLoading(false);
     }
@@ -60,8 +67,8 @@ export default function Admin() {
       const normalized = (res?.data ?? []).map(normalizeGate).filter(Boolean);
       setGates(normalized);
     } catch (err) {
-      console.error("Error fetching gates:", err);
-      setError("Failed to fetch gates.");
+      console.error(err);
+      setError(getErrMsg(err, "Failed to fetch gates."));
     }
   };
 
@@ -71,8 +78,8 @@ export default function Admin() {
       const normalized = (res?.data ?? []).map(normalizeAirport).filter(Boolean);
       setAirports(normalized);
     } catch (err) {
-      console.error("Error fetching airports:", err);
-      setError("Failed to fetch airports.");
+      console.error(err);
+      setError(getErrMsg(err, "Failed to fetch airports."));
     }
   };
 
@@ -90,16 +97,12 @@ export default function Admin() {
 
   const handleAddOrUpdateFlight = async () => {
     const flightData = {
-      aircraft: {
-        airlineName: form.airlineName,
-        type: form.type,
-      },
+      aircraft: { airlineName: form.airlineName, type: form.type },
       departureAirport: { id: Number(form.departureAirportId) },
-      arrivalAirport:   { id: Number(form.arrivalAirportId) },
-      gate:             { id: Number(form.gateId) },
+      arrivalAirport: { id: Number(form.arrivalAirportId) },
+      gate: { id: Number(form.gateId) },
     };
 
-    // Basic validation
     if (!flightData.aircraft.airlineName || !flightData.aircraft.type) {
       setError("Please provide airline name and aircraft type.");
       return;
@@ -110,9 +113,10 @@ export default function Admin() {
     }
 
     try {
+      setError(null);
       setSaving(true);
       if (editingFlightId) {
-        await api.put(`/flight/${editingFlightId}`, flightData);
+        await api.put(`/flight/${Number(editingFlightId)}`, flightData);
       } else {
         await api.post("/flight", flightData);
       }
@@ -125,10 +129,9 @@ export default function Admin() {
       });
       setEditingFlightId(null);
       await fetchFlights();
-      setError(null);
     } catch (err) {
-      console.error("Error saving flight:", err);
-      setError("Failed to save flight. Please check your input.");
+      console.error(err);
+      setError(getErrMsg(err, "Failed to save flight. Please check your input."));
     } finally {
       setSaving(false);
     }
@@ -137,8 +140,7 @@ export default function Admin() {
   const handleEditFlight = (flight) => {
     const dep = airports.find((a) => a.name === flight?.departureAirport?.name);
     const arr = airports.find((a) => a.name === flight?.arrivalAirport?.name);
-    const g = gates.find((g) => g.code === flight?.gate?.code);
-
+    const g = gates.find((x) => x.code === flight?.gate?.code);
     setEditingFlightId(flight.id);
     setForm({
       airlineName: flight.aircraft?.airlineName || "",
@@ -151,11 +153,17 @@ export default function Admin() {
 
   const handleDeleteFlight = async (id) => {
     try {
-      await api.delete(`/flight/${id}`);
+      setError(null);
+      await api.delete(`/flight/${Number(id)}`);
       await fetchFlights();
     } catch (err) {
-      console.error("Error deleting flight:", err);
-      setError("Failed to delete flight.");
+      console.error(err);
+      const body = err?.response?.data;
+      if (/constraint|foreign key|integrity/i.test(String(body))) {
+        setError("Cannot delete flight due to related records.");
+      } else {
+        setError(getErrMsg(err, "Failed to delete flight."));
+      }
     }
   };
 
@@ -170,57 +178,114 @@ export default function Admin() {
     });
   };
 
-  // ===== Gate CRUD =====
+  // ===== Gate CRUD (JSON, includes airport) =====
   const handleAddOrUpdateGate = async () => {
     try {
-      if (editingGateId) {
-        await api.put(`/gate/${editingGateId}`, gateForm);
-      } else {
-        await api.post("/gate", gateForm);
+      setError(null);
+
+      if (!gateForm.code) {
+        setError("Gate code is required.");
+        return;
       }
-      setGateForm({ code: "" });
+      if (!gateForm.airportId) {
+        setError("Please select an airport for this gate.");
+        return;
+      }
+
+      const payload = {
+        code: gateForm.code,
+        airport: { id: Number(gateForm.airportId) },
+        ...(editingGateId ? { id: Number(editingGateId) } : {}),
+      };
+
+      if (editingGateId) {
+        await api.put(`/gate/${Number(editingGateId)}`, payload);
+      } else {
+        await api.post("/gate", payload);
+      }
+
+      setGateForm({ code: "", airportId: "" });
       setEditingGateId(null);
-      fetchGates();
+      await fetchGates();
     } catch (err) {
-      console.error("Error saving gate:", err);
-      setError("Failed to save gate.");
+      console.error(err);
+      const status = err?.response?.status;
+      const body = err?.response?.data;
+      if (status === 415) {
+        setError("Server rejected content type. (Backend expects JSON @RequestBody.)");
+      } else if (status === 409 || /duplicate|unique/i.test(String(body))) {
+        setError("Gate code must be unique.");
+      } else if (/constraint|foreign key|integrity/i.test(String(body))) {
+        setError("Cannot modify gate: it’s referenced by flights.");
+      } else {
+        setError(getErrMsg(err, "Failed to save gate."));
+      }
     }
   };
 
   const handleEditGate = (gate) => {
-    setGateForm({ code: gate.code });
+    // try to map gate -> airportId if available
+    const match = airports.find((a) => a.name === gate?.airport?.name || a.id === gate?.airport?.id);
+    setGateForm({ code: gate.code, airportId: match?.id || "" });
     setEditingGateId(gate.id);
   };
 
   const handleDeleteGate = async (id) => {
     try {
-      await api.delete(`/gate/${id}`);
-      fetchGates();
+      setError(null);
+      await api.delete(`/gate/${Number(id)}`);
+      await fetchGates();
     } catch (err) {
-      console.error("Error deleting gate:", err);
-      setError("Failed to delete gate.");
+      console.error(err);
+      const body = err?.response?.data;
+      if (/constraint|foreign key|integrity/i.test(String(body))) {
+        setError("Cannot delete gate: it’s assigned to one or more flights.");
+      } else {
+        setError(getErrMsg(err, "Failed to delete gate."));
+      }
     }
   };
 
   const handleCancelGateEdit = () => {
     setEditingGateId(null);
-    setGateForm({ code: "" });
+    setGateForm({ code: "", airportId: "" });
   };
 
-  // ===== Airport CRUD =====
+  // ===== Airport CRUD (JSON) =====
   const handleAddOrUpdateAirport = async () => {
     try {
-      if (editingAirportId) {
-        await api.put(`/airport/${editingAirportId}`, airportForm);
-      } else {
-        await api.post("/airport", airportForm);
+      setError(null);
+
+      if (!airportForm.name) {
+        setError("Airport name is required.");
+        return;
       }
+
+      const payload = {
+        name: airportForm.name,
+        ...(editingAirportId ? { id: Number(editingAirportId) } : {}),
+      };
+
+      if (editingAirportId) {
+        await api.put(`/airport/${Number(editingAirportId)}`, payload);
+      } else {
+        await api.post("/airport", payload);
+      }
+
       setAirportForm({ name: "" });
       setEditingAirportId(null);
-      fetchAirports();
+      await fetchAirports();
     } catch (err) {
-      console.error("Error saving airport:", err);
-      setError("Failed to save airport.");
+      console.error(err);
+      const status = err?.response?.status;
+      const body = err?.response?.data;
+      if (status === 415) {
+        setError("Server rejected content type. (Backend expects JSON @RequestBody.)");
+      } else if (status === 409 || /duplicate|unique/i.test(String(body))) {
+        setError("Airport name must be unique.");
+      } else {
+        setError(getErrMsg(err, "Failed to save airport."));
+      }
     }
   };
 
@@ -231,11 +296,17 @@ export default function Admin() {
 
   const handleDeleteAirport = async (id) => {
     try {
-      await api.delete(`/airport/${id}`);
-      fetchAirports();
+      setError(null);
+      await api.delete(`/airport/${Number(id)}`);
+      await fetchAirports();
     } catch (err) {
-      console.error("Error deleting airport:", err);
-      setError("Failed to delete airport.");
+      console.error(err);
+      const body = err?.response?.data;
+      if (/constraint|foreign key|integrity/i.test(String(body))) {
+        setError("Cannot delete airport: it’s referenced by one or more flights or gates.");
+      } else {
+        setError(getErrMsg(err, "Failed to delete airport."));
+      }
     }
   };
 
@@ -371,7 +442,7 @@ export default function Admin() {
         </ul>
       )}
 
-      {/* GATE CRUD SECTION */}
+      {/* GATE CRUD */}
       <hr style={{ margin: "20px 0", borderColor: "var(--color-border)" }} />
       <h2>Manage Gates</h2>
 
@@ -385,8 +456,22 @@ export default function Admin() {
               placeholder="Gate Code"
               data-testid="gate-code"
               value={gateForm.code}
-              onChange={(e) => setGateForm({ code: e.target.value })}
+              onChange={(e) => setGateForm((s) => ({ ...s, code: e.target.value }))}
             />
+          </label>
+          <label>
+            Airport:
+            <select
+              value={gateForm.airportId}
+              onChange={(e) => setGateForm((s) => ({ ...s, airportId: e.target.value }))}
+            >
+              <option value="">-- Select --</option>
+              {airports.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.code ? `${a.code} — ${a.name}` : a.name}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="row">
             <button onClick={handleAddOrUpdateGate}>
@@ -415,7 +500,7 @@ export default function Admin() {
         </ul>
       )}
 
-      {/* AIRPORT CRUD SECTION */}
+      {/* AIRPORT CRUD */}
       <hr style={{ margin: "20px 0", borderColor: "var(--color-border)" }} />
       <h2>Manage Airports</h2>
 
@@ -435,9 +520,7 @@ export default function Admin() {
             <button onClick={handleAddOrUpdateAirport}>
               {editingAirportId ? "Update Airport" : "Add Airport"}
             </button>
-            {editingAirportId && (
-              <button onClick={handleCancelAirportEdit}>Cancel</button>
-            )}
+            {editingAirportId && <button onClick={handleCancelAirportEdit}>Cancel</button>}
           </div>
         </div>
       </div>
