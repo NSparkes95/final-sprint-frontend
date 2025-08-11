@@ -94,16 +94,17 @@ export default function Admin() {
         airlineName: form.airlineName,
         type: form.type,
       },
-      departureAirportId: form.departureAirportId || null,
-      arrivalAirportId: form.arrivalAirportId || null,
-      gateId: form.gateId || null,
+      departureAirport: { id: Number(form.departureAirportId) },
+      arrivalAirport:   { id: Number(form.arrivalAirportId) },
+      gate:             { id: Number(form.gateId) },
     };
 
+    // Basic validation
     if (!flightData.aircraft.airlineName || !flightData.aircraft.type) {
       setError("Please provide airline name and aircraft type.");
       return;
     }
-    if (!flightData.departureAirportId || !flightData.arrivalAirportId) {
+    if (!form.departureAirportId || !form.arrivalAirportId) {
       setError("Please select both departure and arrival airports.");
       return;
     }
@@ -111,9 +112,9 @@ export default function Admin() {
     try {
       setSaving(true);
       if (editingFlightId) {
-        await api.put(`/flights/${editingFlightId}`, flightData);
+        await api.put(`/flight/${editingFlightId}`, flightData);
       } else {
-        await api.post("/flights", flightData);
+        await api.post("/flight", flightData);
       }
       setForm({
         airlineName: "",
@@ -150,7 +151,7 @@ export default function Admin() {
 
   const handleDeleteFlight = async (id) => {
     try {
-      await api.delete(`/flights/${id}`);
+      await api.delete(`/flight/${id}`);
       await fetchFlights();
     } catch (err) {
       console.error("Error deleting flight:", err);
@@ -173,9 +174,9 @@ export default function Admin() {
   const handleAddOrUpdateGate = async () => {
     try {
       if (editingGateId) {
-        await api.put(`/gates/${editingGateId}`, gateForm);
+        await api.put(`/gate/${editingGateId}`, gateForm);
       } else {
-        await api.post("/gates", gateForm);
+        await api.post("/gate", gateForm);
       }
       setGateForm({ code: "" });
       setEditingGateId(null);
@@ -193,7 +194,7 @@ export default function Admin() {
 
   const handleDeleteGate = async (id) => {
     try {
-      await api.delete(`/gates/${id}`);
+      await api.delete(`/gate/${id}`);
       fetchGates();
     } catch (err) {
       console.error("Error deleting gate:", err);
@@ -210,9 +211,9 @@ export default function Admin() {
   const handleAddOrUpdateAirport = async () => {
     try {
       if (editingAirportId) {
-        await api.put(`/airports/${editingAirportId}`, airportForm);
+        await api.put(`/airport/${editingAirportId}`, airportForm);
       } else {
-        await api.post("/airports", airportForm);
+        await api.post("/airport", airportForm);
       }
       setAirportForm({ name: "" });
       setEditingAirportId(null);
@@ -230,7 +231,7 @@ export default function Admin() {
 
   const handleDeleteAirport = async (id) => {
     try {
-      await api.delete(`/airports/${id}`);
+      await api.delete(`/airport/${id}`);
       fetchAirports();
     } catch (err) {
       console.error("Error deleting airport:", err);
