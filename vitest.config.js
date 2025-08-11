@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// ESM-compatible __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -13,5 +12,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: path.resolve(__dirname, './src/setupTests.js'),
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+    },
   },
 });
