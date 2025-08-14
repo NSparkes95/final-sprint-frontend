@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
+import { normalizeFlight } from '../services/transformers';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const isTest = import.meta?.env?.MODE === 'test';
 
 const Arrivals = () => {
   const [arrivals, setArrivals] = useState([]);
@@ -10,17 +14,21 @@ const Arrivals = () => {
     const fetchArrivals = async () => {
       try {
         setIsLoading(true);
-        setError(null);
+        if (!isTest) await sleep(1000); // keep UX delay but skip in tests
 
-        // Artificial delay for testing the loading spinner
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const res = await api.get('/flights');
+        const data = Array.isArray(res?.data) ? res.data : [];
 
-        const response = await axios.get('http://localhost:8080/flights');
-        const data = response.data;
-        const filteredArrivals = data.filter(
-          flight => flight.arrivalAirport?.name === "St. John's Intl"
+        // Normalize everything first so we’re resilient to backend shape changes
+        const normalized = data.map(normalizeFlight);
+
+        // Filter for YYT arrivals (or whatever your target is)
+        const filtered = normalized.filter(
+          (f) => f.arrivalAirport?.name === "St. John's Intl"
         );
-        setArrivals(filteredArrivals);
+
+        setArrivals(filtered);
+        setError(null);
       } catch (err) {
         console.error('Error fetching flights:', err);
         setError('Error fetching arrivals. Please try again later.');
@@ -35,20 +43,18 @@ const Arrivals = () => {
   return (
     <div>
       <h2>Arrivals</h2>
-
       {isLoading && <p>Loading arrivals...</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      {!isLoading && !error && arrivals.length === 0 && (
-        <p>No arrivals found.</p>
-      )}
+      {!isLoading && !error && arrivals.length === 0 && <p>No arrivals found.</p>}
 
       {!isLoading && !error && arrivals.length > 0 && (
         <ul>
           {arrivals.map((flight) => (
             <li key={flight.id}>
-              ✈️ <strong>{flight.aircraft?.airlineName || 'Unknown Airline'}</strong>  
-              from <strong>{flight.departureAirport?.name || 'Unknown'}</strong>  
-              to <strong>{flight.arrivalAirport?.name || 'Unknown'}</strong><br />
+              ✈️ <strong>{flight.aircraft?.airlineName || 'Unknown Airline'}</strong>
+              {' '}from <strong>{flight.departureAirport?.name || 'Unknown'}</strong>
+              {' '}to <strong>{flight.arrivalAirport?.name || 'Unknown'}</strong>
+              <br />
               Gate: {flight.gate?.code || 'TBD'} | Type: {flight.aircraft?.type || 'Unknown'}
             </li>
           ))}
