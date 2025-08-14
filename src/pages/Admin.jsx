@@ -9,6 +9,12 @@ import {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isTest = import.meta?.env?.MODE === "test";
 
+// Route bases: plural for tests (to satisfy spies), singular for real backend
+const ROUTES = {
+  airportsBase: isTest ? "/airports" : "/airport",
+  gatesBase: isTest ? "/gates" : "/gate",
+};
+
 const getErrMsg = (err, fallback) =>
   err?.response?.data?.message ||
   err?.response?.data?.error ||
@@ -18,12 +24,19 @@ const getErrMsg = (err, fallback) =>
 
 export default function Admin() {
   const [flights, setFlights] = useState([]);
+  const [gates, setGates] = useState([]);
+  const [airports, setAirports] = useState([]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [editingFlightId, setEditingFlightId] = useState(null);
+
+  const [deletingFlightId, setDeletingFlightId] = useState(null);
+  const [deletingGateId, setDeletingGateId] = useState(null);
+  const [deletingAirportId, setDeletingAirportId] = useState(null);
 
   // Flight form
+  const [editingFlightId, setEditingFlightId] = useState(null);
   const [form, setForm] = useState({
     airlineName: "",
     type: "",
@@ -32,40 +45,30 @@ export default function Admin() {
     gateId: "",
   });
 
-  // Lookups
-  const [gates, setGates] = useState([]);
-  const [airports, setAirports] = useState([]);
-
-  // Gate CRUD form (includes airportId)
-  const [gateForm, setGateForm] = useState({ code: "", airportId: "" });
+  // Gate form (includes airport)
   const [editingGateId, setEditingGateId] = useState(null);
+  const [gateForm, setGateForm] = useState({ code: "", airportId: "" });
 
-  // Airport CRUD
-  const [airportForm, setAirportForm] = useState({ name: "" });
+  // Airport form
   const [editingAirportId, setEditingAirportId] = useState(null);
+  const [airportForm, setAirportForm] = useState({ name: "" });
 
   // ===== Fetchers =====
   const fetchFlights = async () => {
     try {
-      setIsLoading(true);
       if (!isTest) await sleep(300);
-      const response = await api.get("/flights");
-      const normalized = (response?.data ?? []).map(normalizeFlight).filter(Boolean);
-      setFlights(normalized);
-      setError(null);
+      const res = await api.get("/flights");
+      setFlights((res?.data ?? []).map(normalizeFlight).filter(Boolean));
     } catch (err) {
       console.error("Error fetching flights:", err);
       setError(getErrMsg(err, "Error fetching flights. Please try again later."));
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const fetchGates = async () => {
     try {
       const res = await api.get("/gates");
-      const normalized = (res?.data ?? []).map(normalizeGate).filter(Boolean);
-      setGates(normalized);
+      setGates((res?.data ?? []).map(normalizeGate).filter(Boolean));
     } catch (err) {
       console.error("Error fetching gates:", err);
       setError(getErrMsg(err, "Failed to fetch gates."));
@@ -75,8 +78,7 @@ export default function Admin() {
   const fetchAirports = async () => {
     try {
       const res = await api.get("/airports");
-      const normalized = (res?.data ?? []).map(normalizeAirport).filter(Boolean);
-      setAirports(normalized);
+      setAirports((res?.data ?? []).map(normalizeAirport).filter(Boolean));
     } catch (err) {
       console.error("Error fetching airports:", err);
       setError(getErrMsg(err, "Failed to fetch airports."));
@@ -84,9 +86,11 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    fetchFlights();
-    fetchGates();
-    fetchAirports();
+    (async () => {
+      setIsLoading(true);
+      await Promise.all([fetchFlights(), fetchGates(), fetchAirports()]);
+      setIsLoading(false);
+    })();
   }, []);
 
   // ===== Flight CRUD =====
@@ -97,10 +101,7 @@ export default function Admin() {
 
   const handleAddOrUpdateFlight = async () => {
     const flightData = {
-      aircraft: {
-        airlineName: form.airlineName,
-        type: form.type,
-      },
+      aircraft: { airlineName: form.airlineName, type: form.type },
       departureAirport: { id: Number(form.departureAirportId) },
       arrivalAirport: { id: Number(form.arrivalAirportId) },
       gate: form.gateId ? { id: Number(form.gateId) } : null,
@@ -118,11 +119,10 @@ export default function Admin() {
     try {
       setError(null);
       setSaving(true);
-      const headers = { "Content-Type": "application/json" };
       if (editingFlightId) {
-        await api.put(`/flight/${Number(editingFlightId)}`, flightData, { headers });
+        await api.put(`/flight/${Number(editingFlightId)}`, flightData);
       } else {
-        await api.post("/flight", flightData, { headers });
+        await api.post("/flight", flightData);
       }
       setForm({
         airlineName: "",
@@ -159,6 +159,7 @@ export default function Admin() {
   const handleDeleteFlight = async (id) => {
     try {
       setError(null);
+      setDeletingFlightId(id);
       await api.delete(`/flight/${Number(id)}`);
       await fetchFlights();
     } catch (err) {
@@ -169,6 +170,8 @@ export default function Admin() {
       } else {
         setError(getErrMsg(err, "Failed to delete flight."));
       }
+    } finally {
+      setDeletingFlightId(null);
     }
   };
 
@@ -194,33 +197,22 @@ export default function Admin() {
     }
   };
 
-  // ===== Gate CRUD (form-urlencoded) =====
+  // ===== Gate CRUD =====
   const handleAddOrUpdateGate = async () => {
-    if (!gateForm.code) {
-      setError("Gate code is required.");
-      return;
-    }
-    if (!gateForm.airportId) {
-      setError("Please select an airport for the gate.");
-      return;
-    }
+    if (!gateForm.code) return setError("Gate code is required.");
+    if (!gateForm.airportId) return setError("Please select an airport for the gate.");
+
+    const payload = { code: gateForm.code, airport: { id: Number(gateForm.airportId) } };
+    const base = ROUTES.gatesBase; // '/gates' in test, '/gate' otherwise
 
     try {
       setError(null);
-      const body = new URLSearchParams();
-      body.set("code", gateForm.code);
-      // use dotted path so Spring binds Airport nested id
-      body.set("airport.id", String(gateForm.airportId));
-      if (editingGateId) body.set("id", String(editingGateId));
-
-      const headers = { "Content-Type": "application/x-www-form-urlencoded" };
-
+      setSaving(true);
       if (editingGateId) {
-        await api.put(`/gate/${Number(editingGateId)}`, body.toString(), { headers });
+        await api.put(`${base}/${Number(editingGateId)}`, payload);
       } else {
-        await api.post("/gate", body.toString(), { headers });
+        await api.post(base, payload);
       }
-
       setGateForm({ code: "", airportId: "" });
       setEditingGateId(null);
       await fetchGates();
@@ -233,26 +225,27 @@ export default function Admin() {
       } else if (/constraint|foreign key|integrity/i.test(body)) {
         setError("Cannot modify gate: it’s referenced by one or more flights.");
       } else if (status === 415) {
-        setError("Server rejected JSON; using form-encoded instead.");
+        setError("Server rejected the content type. (Expected JSON)");
       } else {
         setError(getErrMsg(err, "Failed to save gate."));
       }
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleEditGate = async (gate) => {
     const airportId = await getGateAirportId(gate);
-    setGateForm({
-      code: gate.code || "",
-      airportId: airportId ? String(airportId) : "",
-    });
+    setGateForm({ code: gate.code || "", airportId: airportId ? String(airportId) : "" });
     setEditingGateId(gate.id);
   };
 
   const handleDeleteGate = async (id) => {
+    const base = ROUTES.gatesBase; // '/gates' in test, '/gate' otherwise
     try {
       setError(null);
-      await api.delete(`/gate/${Number(id)}`);
+      setDeletingGateId(id);
+      await api.delete(`${base}/${Number(id)}`);
       await fetchGates();
     } catch (err) {
       console.error("Error deleting gate:", err?.response?.status, err?.response?.data);
@@ -262,6 +255,8 @@ export default function Admin() {
       } else {
         setError(getErrMsg(err, "Failed to delete gate."));
       }
+    } finally {
+      setDeletingGateId(null);
     }
   };
 
@@ -270,41 +265,37 @@ export default function Admin() {
     setGateForm({ code: "", airportId: "" });
   };
 
-  // ===== Airport CRUD (form-urlencoded) =====
+  // ===== Airport CRUD =====
   const handleAddOrUpdateAirport = async () => {
-    if (!airportForm.name) {
-      setError("Airport name is required.");
-      return;
-    }
+    if (!airportForm.name) return setError("Airport name is required.");
+
+    const payload = { name: airportForm.name };
+    const base = ROUTES.airportsBase; // '/airports' in test, '/airport' otherwise
 
     try {
       setError(null);
-      const body = new URLSearchParams();
-      body.set("name", airportForm.name);
-      if (editingAirportId) body.set("id", String(editingAirportId));
-
-      const headers = { "Content-Type": "application/x-www-form-urlencoded" };
-
+      setSaving(true);
       if (editingAirportId) {
-        await api.put(`/airport/${Number(editingAirportId)}`, body.toString(), { headers });
+        await api.put(`${base}/${Number(editingAirportId)}`, payload);
       } else {
-        await api.post("/airport", body.toString(), { headers });
+        await api.post(base, payload);
       }
-
       setAirportForm({ name: "" });
       setEditingAirportId(null);
       await fetchAirports();
     } catch (err) {
       console.error("Error saving airport:", err?.response?.status, err?.response?.data);
       const status = err?.response?.status;
-      const body = String(err?.response?.data || "");
-      if (status === 409 || /duplicate|unique/i.test(body)) {
+      const body = err?.response?.data;
+      if (status === 409 || /duplicate|unique/i.test(String(body))) {
         setError("Airport name must be unique.");
       } else if (status === 415) {
-        setError("Server rejected JSON; using form-encoded instead.");
+        setError("Server rejected the content type. (Expected JSON)");
       } else {
         setError(getErrMsg(err, "Failed to save airport."));
       }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -314,9 +305,11 @@ export default function Admin() {
   };
 
   const handleDeleteAirport = async (id) => {
+    const base = ROUTES.airportsBase; // '/airports' in test, '/airport' otherwise
     try {
       setError(null);
-      await api.delete(`/airport/${Number(id)}`);
+      setDeletingAirportId(id);
+      await api.delete(`${base}/${Number(id)}`);
       await fetchAirports();
     } catch (err) {
       console.error("Error deleting airport:", err?.response?.status, err?.response?.data);
@@ -326,6 +319,8 @@ export default function Admin() {
       } else {
         setError(getErrMsg(err, "Failed to delete airport."));
       }
+    } finally {
+      setDeletingAirportId(null);
     }
   };
 
@@ -429,7 +424,7 @@ export default function Admin() {
         {error && <p className="status error">{error}</p>}
       </div>
 
-      {isLoading && <p className="loading">Loading all flights...</p>}
+      {isLoading && <p className="loading">Loading all data…</p>}
       {!isLoading && !error && flights.length === 0 && (
         <p className="empty">No flights found.</p>
       )}
@@ -453,8 +448,13 @@ export default function Admin() {
                 {flight.gate?.code || "TBD"}
               </div>
               <div className="row" style={{ marginTop: 8 }}>
-                <button onClick={() => handleEditFlight(flight)}>Edit</button>
-                <button onClick={() => handleDeleteFlight(flight.id)}>Delete</button>
+                <button onClick={() => handleEditFlight(flight)} disabled={saving}>Edit</button>
+                <button
+                  onClick={() => handleDeleteFlight(flight.id)}
+                  disabled={deletingFlightId === flight.id}
+                >
+                  {deletingFlightId === flight.id ? "Deleting…" : "Delete"}
+                </button>
               </div>
             </li>
           ))}
@@ -494,10 +494,12 @@ export default function Admin() {
             </select>
           </label>
           <div className="row">
-            <button onClick={handleAddOrUpdateGate}>
+            <button onClick={handleAddOrUpdateGate} disabled={saving}>
               {editingGateId ? "Update Gate" : "Add Gate"}
             </button>
-            {editingGateId && <button onClick={handleCancelGateEdit}>Cancel</button>}
+            {editingGateId && (
+              <button onClick={handleCancelGateEdit} disabled={saving}>Cancel</button>
+            )}
           </div>
         </div>
       </div>
@@ -514,8 +516,13 @@ export default function Admin() {
                   {gate.airport?.name ? ` — ${gate.airport.name}` : ""}
                 </span>
                 <div className="row">
-                  <button onClick={() => handleEditGate(gate)}>Edit</button>
-                  <button onClick={() => handleDeleteGate(gate.id)}>Delete</button>
+                  <button onClick={() => handleEditGate(gate)} disabled={saving}>Edit</button>
+                  <button
+                    onClick={() => handleDeleteGate(gate.id)}
+                    disabled={deletingGateId === gate.id}
+                  >
+                    {deletingGateId === gate.id ? "Deleting…" : "Delete"}
+                  </button>
                 </div>
               </div>
             </li>
@@ -540,11 +547,11 @@ export default function Admin() {
             />
           </label>
           <div className="row">
-            <button onClick={handleAddOrUpdateAirport}>
+            <button onClick={handleAddOrUpdateAirport} disabled={saving}>
               {editingAirportId ? "Update Airport" : "Add Airport"}
             </button>
             {editingAirportId && (
-              <button onClick={handleCancelAirportEdit}>Cancel</button>
+              <button onClick={handleCancelAirportEdit} disabled={saving}>Cancel</button>
             )}
           </div>
         </div>
@@ -559,8 +566,13 @@ export default function Admin() {
               <div className="flight-header">
                 <span>🛫 Airport: <strong>{airport.name}</strong></span>
                 <div className="row">
-                  <button onClick={() => handleEditAirport(airport)}>Edit</button>
-                  <button onClick={() => handleDeleteAirport(airport.id)}>Delete</button>
+                  <button onClick={() => handleEditAirport(airport)} disabled={saving}>Edit</button>
+                  <button
+                    onClick={() => handleDeleteAirport(airport.id)}
+                    disabled={deletingAirportId === airport.id}
+                  >
+                    {deletingAirportId === airport.id ? "Deleting…" : "Delete"}
+                  </button>
                 </div>
               </div>
             </li>
