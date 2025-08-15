@@ -1,54 +1,54 @@
-# Final Sprint — Aviation Frontend (React + Vite)
+# ✈️ Final Sprint — Aviation Frontend (React + Vite)
 
-A single-page React application for viewing airport arrivals and departures, with an admin panel to add and edit flights. Connects to a Spring Boot backend API.
+A single-page React application for viewing airport arrivals and departures, with an admin panel to manage flights. Connects to a Spring Boot backend API.
 
----
-
-# Live Links
-
-**Frontend (S3/CloudFront):** <Frontend Live Link> - add once connected
-
-**Backend API:** http://3.145.47.123:8080
-
-**Trello Board:** https://trello.com/b/sJ6KUDuZ/s4-final
-
-**Key PRs:** <https://github.com/NSparkes95/final-sprint-frontend/pull/6>, <https://github.com/NSparkes95/final-sprint-frontend/pull/5>
+> **Note:** AWS S3/CloudFront hosting was planned but not fully connected for this submission due to issues out of our control. The frontend is currently run locally and connects directly to the deployed backend API.
 
 ---
 
-# Quick Start (Local Development)
+## 🔗 Live Links
+- **Frontend (S3/CloudFront):** _Not connected in final submission_
+- **Backend API:** [http://3.145.47.123:8080](http://3.145.47.123:8080)  
+- **Trello Board:** [https://trello.com/b/sJ6KUDuZ/s4-final](https://trello.com/b/sJ6KUDuZ/s4-final)  
+- **Key PRs:** [#6](https://github.com/NSparkes95/final-sprint-frontend/pull/6), [#5](https://github.com/NSparkes95/final-sprint-frontend/pull/5)
 
-**Install dependencies**
+---
+
+# ⚡ Quick Start (Local Development)
+
+## Install dependencies
+```bash
 npm install
-
-**Start development server**
+```
+## Start development server
+```bash
 npm run dev
-
-
-**Run tests locally:**
+```
+## Run tests locally
+```bash
 npm test
-
-
-CI runs on every PR and push. See .github/workflows/ci.yml.
+```
+CI runs on every PR and push. See .github/workflows/ci.yml for details.
 
 ---
 
-# Environment Variables
+# ⚙️ Environment Variables
 
-**Create a .env (local) or .env.production (for deployment):**
+Create a .env file for local development or .env.production for deployment:
 
 VITE_API_BASE_URL=http://3.145.47.123:8080
 
 ---
 
-# Build & Deploy (S3 / CloudFront)
+# 📦 Build & Deploy (Planned S3 / CloudFront)
+```bash
 npm run build
-
-**Deploy via AWS Console or CLI:**
-aws s3 sync dist/ s3://<your-bucket-name> --add when conencted
-
-
-**S3 Static Website Hosting / CloudFront settings:**
+```
+Deploy via AWS CLI (once connected to S3 bucket):
+```bash
+aws s3 sync dist/ s3://BUCKET-NAME
+```
+## S3 Static Website Hosting / CloudFront settings:
 
 - Index document: index.html
 
@@ -56,7 +56,7 @@ aws s3 sync dist/ s3://<your-bucket-name> --add when conencted
 
 ---
 
-# Features Implemented
+## ✅ Features Implemented
 
 - Arrivals & Departures pages with loading, empty, and error states
 
@@ -74,15 +74,15 @@ aws s3 sync dist/ s3://<your-bucket-name> --add when conencted
 
 ---
 
-# Manual Test Script
+## 🧪 Manual Test Script
 
 See /docs/manual-test-cases.md for detailed frontend testing steps.
 
 ---
 
-# Team & Workflow
+## 👥 Team & Workflow
 
-**Roles:**
+Roles:
 
 - Christian Rose — Frontend Development
 
@@ -90,7 +90,7 @@ See /docs/manual-test-cases.md for detailed frontend testing steps.
 
 - Dylan Finlay — Additional Support
 
-**Workflow:**
+Workflow:
 
 - Feature branches → Pull Requests → main
 
